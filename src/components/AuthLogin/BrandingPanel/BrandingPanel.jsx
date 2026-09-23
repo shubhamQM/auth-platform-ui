@@ -1,8 +1,8 @@
 import {
-  Security,
-  Shield,
-  Speed,
-} from "@mui/icons-material";
+  HierarchySquare,
+  MagicStar,
+  SecurityUser,
+} from "iconsax-react";
 
 import {
   Box,
@@ -10,9 +10,9 @@ import {
 } from "@mui/material";
 
 const featureIcons = {
-  security: Security,
-  performance: Speed,
-  protection: Shield,
+  leadTracking: HierarchySquare,
+  insights: MagicStar,
+  roleAccess: SecurityUser,
 };
 
 function BrandingPanel({
@@ -20,6 +20,7 @@ function BrandingPanel({
 }) {
   const {
     logo,
+    logoText = "A",
     title,
     hero,
     features = [],
@@ -30,59 +31,75 @@ function BrandingPanel({
     <Box
       sx={{
         width: "100%",
-        minHeight: "100vh",
+        height: "100%",
         display: "flex",
         flexDirection: "column",
-        justifyContent: "space-between",
+
         padding: {
-          md: 5,
-          lg: 6,
+          md: 4,
+          lg: 4.5,
         },
+
+        boxSizing: "border-box",
+        overflow: "hidden",
+
         background:
-          "linear-gradient(180deg, #2a1b6d 0%, #1d164d 50%, #16123a 100%)",
+          "linear-gradient(180deg, #2a1b6d 0%, #21175a 50%, #191442 100%)",
+
         color: "#ffffff",
       }}
     >
-      {/* Branding */}
-      <Box>
+      {/* Logo + Brand */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+          flexShrink: 0,
+        }}
+      >
         {logo ? (
           <Box
             component="img"
             src={logo}
             alt={title}
             sx={{
-              maxWidth: 180,
-              maxHeight: 56,
+              maxWidth: 150,
+              maxHeight: 44,
               objectFit: "contain",
-              marginBottom: 2,
             }}
           />
         ) : (
           <Box
             sx={{
-              display: "inline-flex",
+              width: 42,
+              height: 42,
+              flexShrink: 0,
+
+              display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: 48,
-              height: 48,
+
               borderRadius: 2,
-              backgroundColor:
-                "rgba(99, 70, 229, 0.95)",
+
+              background:
+                "linear-gradient(135deg, #7657f5 0%, #6346e5 100%)",
+
               fontWeight: 800,
-              fontSize: "1.1rem",
-              marginBottom: 2,
+              fontSize: "1rem",
             }}
           >
-            A
+            {logoText}
           </Box>
         )}
 
         {title && (
           <Typography
-            variant="h6"
+            variant="subtitle1"
             sx={{
               fontWeight: 800,
-              letterSpacing: "-0.02em",
+              fontSize: "1rem",
+              letterSpacing: "-0.01em",
             }}
           >
             {title}
@@ -90,71 +107,110 @@ function BrandingPanel({
         )}
       </Box>
 
-      {/* Hero + Features */}
+      {/* Main Branding Content */}
       <Box
         sx={{
-          maxWidth: 560,
-          marginY: 6,
+          flex: 1,
+
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+
+          minHeight: 0,
+          paddingY: 2,
         }}
       >
-        {hero?.title && (
-          <Typography
-            component="h2"
-            sx={{
-              fontSize: {
-                md: "2.5rem",
-                lg: "3.25rem",
-              },
-              lineHeight: 1.1,
-              fontWeight: 800,
-              letterSpacing: "-0.04em",
-              marginBottom: 0,
-            }}
-          >
-            {hero.title}
-          </Typography>
-        )}
+        {/* Hero */}
+        <Box
+          sx={{
+            marginBottom: 3.5,
+          }}
+        >
+          {hero?.title && (
+            <Typography
+              component="h2"
+              sx={{
+                fontSize: {
+                  md: "2rem",
+                  lg: "2.2rem",
+                },
 
-        {hero?.highlight && (
-          <Typography
-            component="span"
-            sx={{
-              display: "block",
-              fontSize: {
-                md: "2.5rem",
-                lg: "3.25rem",
-              },
-              lineHeight: 1.1,
-              fontWeight: 800,
-              letterSpacing: "-0.04em",
-              color: "#8b75ff",
-              marginBottom: 3,
-            }}
-          >
-            {hero.highlight}
-          </Typography>
-        )}
+                lineHeight: 1.08,
+                fontWeight: 800,
+                letterSpacing: "-0.035em",
+              }}
+            >
+              {hero.title}
+            </Typography>
+          )}
 
-        {hero?.description && (
-          <Typography
-            variant="body1"
-            sx={{
-              color: "#b1a7e2",
-              lineHeight: 1.7,
-              maxWidth: 500,
-              marginBottom: 5,
-            }}
-          >
-            {hero.description}
-          </Typography>
-        )}
+          {hero?.highlight && (
+            <Typography
+              component="div"
+              sx={{
+                fontSize: {
+                  md: "2rem",
+                  lg: "2.2rem",
+                },
 
+                lineHeight: 1.08,
+                fontWeight: 800,
+                letterSpacing: "-0.035em",
+
+                color: "#8b75ff",
+              }}
+            >
+              {hero.highlight}
+            </Typography>
+          )}
+
+          {hero?.secondaryTitle && (
+            <Typography
+              component="div"
+              sx={{
+                fontSize: {
+                  md: "2rem",
+                  lg: "2.2rem",
+                },
+
+                lineHeight: 1.08,
+                fontWeight: 800,
+                letterSpacing: "-0.035em",
+
+                marginTop: 2,
+                color: "#ffffff",
+              }}
+            >
+              {hero.secondaryTitle}
+            </Typography>
+          )}
+
+          {hero?.description && (
+            <Typography
+              variant="body2"
+              sx={{
+                maxWidth: 390,
+
+                marginTop: 2,
+
+                color: "#b1a7e2",
+
+                fontSize: "0.82rem",
+                lineHeight: 1.65,
+              }}
+            >
+              {hero.description}
+            </Typography>
+          )}
+        </Box>
+
+        {/* Features */}
         {features.length > 0 && (
           <Box
             sx={{
               display: "flex",
               flexDirection: "column",
-              gap: 3,
+              gap: 2,
             }}
           >
             {features.map(
@@ -172,40 +228,45 @@ function BrandingPanel({
                     }
                     sx={{
                       display: "flex",
-                      gap: 2,
                       alignItems:
                         "flex-start",
+                      gap: 1.5,
                     }}
                   >
+                    {/* Feature Icon */}
                     <Box
                       sx={{
+                        width: 36,
+                        height: 36,
+
                         flexShrink: 0,
-                        width: 42,
-                        height: 42,
+
                         display: "flex",
-                        alignItems: "center",
+                        alignItems:
+                          "center",
                         justifyContent:
                           "center",
-                        borderRadius: "50%",
+
+                        borderRadius: 2,
+
                         backgroundColor:
-                          "rgba(255, 255, 255, 0.08)",
+                          "rgba(255,255,255,0.08)",
+
                         border:
-                          "1px solid rgba(255, 255, 255, 0.1)",
+                          "1px solid rgba(255,255,255,0.08)",
                       }}
                     >
                       {Icon ? (
                         <Icon
-                          sx={{
-                            fontSize: 20,
-                            color:
-                              "#ffffff",
-                          }}
+                          size="18"
+                          color="#c5baff"
+                          variant="Linear"
                         />
                       ) : (
                         <Typography
                           sx={{
                             fontSize:
-                              "1rem",
+                              "0.8rem",
                             fontWeight: 700,
                           }}
                         >
@@ -214,12 +275,22 @@ function BrandingPanel({
                       )}
                     </Box>
 
-                    <Box>
+                    {/* Feature Content */}
+                    <Box
+                      sx={{
+                        paddingTop: 0.1,
+                        minWidth: 0,
+                      }}
+                    >
                       <Typography
-                        variant="subtitle1"
                         sx={{
+                          fontSize:
+                            "0.84rem",
+
                           fontWeight: 700,
-                          marginBottom: 0.5,
+                          lineHeight: 1.35,
+
+                          marginBottom: 0.35,
                         }}
                       >
                         {feature.title}
@@ -227,11 +298,14 @@ function BrandingPanel({
 
                       {feature.description && (
                         <Typography
-                          variant="body2"
                           sx={{
                             color:
                               "#b1a7e2",
-                            lineHeight: 1.5,
+
+                            fontSize:
+                              "0.76rem",
+
+                            lineHeight: 1.45,
                           }}
                         >
                           {
@@ -253,8 +327,12 @@ function BrandingPanel({
         <Typography
           variant="caption"
           sx={{
+            flexShrink: 0,
+
             color:
               "rgba(177, 167, 226, 0.65)",
+
+            fontSize: "0.68rem",
           }}
         >
           {footer}

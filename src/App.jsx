@@ -1,92 +1,71 @@
-import { AuthLogin } from "./index";
+import {
+  AuthLogin,
+  normalizeConfig,
+} from "./index";
+
+import {
+  createAuthApiClient,
+} from "./services/authApi";
+
+import {
+  createAuthHandlers,
+} from "./services/authHandlers";
+
+// --------------------------------------------------
+// Demo / development configuration
+//
+// A consuming portal will eventually supply its own
+// configuration.
+// --------------------------------------------------
+
+const config = normalizeConfig({
+  api: {
+    baseUrl:
+      "http://localhost:5000/api/auth",
+  },
+});
+
+// --------------------------------------------------
+// Isolated API client
+// --------------------------------------------------
+
+const authApiClient =
+  createAuthApiClient({
+    baseUrl:
+      config.api.baseUrl,
+  });
+
+// --------------------------------------------------
+// UI ↔ API handlers
+// --------------------------------------------------
+
+const {
+  handleLogin,
+  handleVerifyTwoFactor,
+  handleResendTwoFactor,
+  handleForgotPassword,
+} = createAuthHandlers(
+  authApiClient
+);
+
+// --------------------------------------------------
+// Demo application
+// --------------------------------------------------
 
 function App() {
-  const handleLogin = async ({
-    email,
-    password,
-    rememberMe,
-    captchaToken,
-  }) => {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 1000);
-    });
-
-    console.log("Login request:", {
-      email,
-      password,
-      rememberMe,
-      captchaToken,
-    });
-
-    return {
-      success: true,
-      requiresTwoFactor: true,
-      challengeId: "demo-challenge-123",
-      email,
-      mobile: "******1234",
-    };
-  };
-
-  const handleVerifyTwoFactor = async ({
-    challengeId,
-    emailCode,
-    mobileCode,
-  }) => {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 1000);
-    });
-
-    console.log("2FA verification:", {
-      challengeId,
-      emailCode,
-      mobileCode,
-    });
-
-    return {
-      success: true,
-    };
-  };
-
-  const handleResendTwoFactor = async ({
-    challengeId,
-    channel,
-  }) => {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 500);
-    });
-
-    console.log("2FA resend:", {
-      challengeId,
-      channel,
-    });
-
-    return {
-      success: true,
-    };
-  };
-
-  const handleForgotPassword = async ({ email }) => {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 1000);
-    });
-
-    console.log("Forgot password:", {
-      email,
-    });
-
-    return {
-      success: true,
-      message:
-        "If an account exists with this email, password reset instructions have been sent.",
-    };
-  };
-
   return (
     <AuthLogin
+      config={config}
       onLogin={handleLogin}
-      onVerifyTwoFactor={handleVerifyTwoFactor}
-      onResendTwoFactor={handleResendTwoFactor}
-      onForgotPassword={handleForgotPassword}
+      onVerifyTwoFactor={
+        handleVerifyTwoFactor
+      }
+      onResendTwoFactor={
+        handleResendTwoFactor
+      }
+      onForgotPassword={
+        handleForgotPassword
+      }
     />
   );
 }

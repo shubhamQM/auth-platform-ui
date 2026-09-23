@@ -1,18 +1,20 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
-import { Box, Button, TextField } from "@mui/material";
+import { Box, Button, TextField, Typography } from "@mui/material";
 
 import RememberMe from "../RememberMe";
 import EmailField from "../Fields/EmailField";
 import LoginError from "./LoginError";
-import ForgotPassword, {
-  ForgotPasswordForm,
-} from "../ForgotPassword";
+
+import ForgotPassword, { ForgotPasswordForm } from "../ForgotPassword";
+
 import Captcha from "../Captcha";
 import PasswordField from "../Fields/PasswordField";
+
 import TwoFactor from "../TwoFactor";
 import useAuthFlow from "../TwoFactor/useAuthFlow";
 import { AUTH_STATES } from "../TwoFactor/authStates";
+import AuthLanding from "../../AuthLanding/AuthLanding";
 
 function LoginForm({
   config,
@@ -21,16 +23,12 @@ function LoginForm({
   onResendTwoFactor,
   onForgotPassword,
 }) {
-  const {
-    fields,
-    texts,
-    behavior,
-    login,
-  } = config;
+  const { fields, texts, behavior, login } = config;
 
   const {
     authState,
     twoFactorData,
+    authenticatedData,
     startAuthentication,
     requireTwoFactor,
     startTwoFactorVerification,
@@ -40,55 +38,70 @@ function LoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState("");
+
+  /*
+   * CAPTCHA token intentionally uses a ref.
+   *
+   * Using state here causes LoginForm to re-render
+   * when Google returns the token, which can reset
+   * the reCAPTCHA checkbox.
+   */
+  const captchaTokenRef = useRef("");
+
   const [loading, setLoading] = useState(false);
 
-  const [showForgotPassword, setShowForgotPassword] =
-    useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const [errors, setErrors] = useState({
     email: "",
     password: "",
+    captcha: "",
     form: "",
   });
+
+  // --------------------------------------------------
+  // Form Validation
+  // --------------------------------------------------
 
   const validateForm = () => {
     const nextErrors = {
       email: "",
       password: "",
+      captcha: "",
       form: "",
     };
 
     const normalizedEmail = email.trim();
 
+    // Email validation
     if (fields.email.enabled && fields.email.required) {
       if (!normalizedEmail) {
         nextErrors.email = "Email is required";
-      } else if (
-        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-          normalizedEmail
-        )
-      ) {
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
         nextErrors.email = "Enter a valid email address";
       }
     }
 
-    if (
-      fields.password.enabled &&
-      fields.password.required
-    ) {
+    // Password validation
+    if (fields.password.enabled && fields.password.required) {
       if (!password) {
         nextErrors.password = "Password is required";
       }
     }
 
+    // CAPTCHA validation
+    if (config.captcha?.enabled && !captchaTokenRef.current) {
+      nextErrors.captcha = "Please complete the CAPTCHA";
+    }
+
     setErrors(nextErrors);
 
-    return (
-      !nextErrors.email &&
-      !nextErrors.password
-    );
+    return !nextErrors.email && !nextErrors.password && !nextErrors.captcha;
   };
+
+  // --------------------------------------------------
+  // Login
+  // --------------------------------------------------
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -97,12 +110,6 @@ function LoginForm({
       return;
     }
 
-    setErrors({
-      email: "",
-      password: "",
-      form: "",
-    });
-
     const isValid = validateForm();
 
     if (!isValid) {
@@ -110,7 +117,6 @@ function LoginForm({
     }
 
     setLoading(true);
-
     startAuthentication();
 
     try {
@@ -118,31 +124,49 @@ function LoginForm({
         email: email.trim(),
         password,
         rememberMe,
-        captchaToken,
+
+        // Send CAPTCHA token to consumer/backend
+        captchaToken: captchaTokenRef.current,
       });
+
+      // ------------------------------------------------
+      // Two Factor Required
+      // ------------------------------------------------
 
       if (result?.requiresTwoFactor) {
         requireTwoFactor({
           challengeId: result.challengeId,
+
           email: result.email || email.trim(),
+
           mobile: result.mobile || "",
         });
 
         return;
       }
 
+      // ------------------------------------------------
+      // Login Successful
+      // ------------------------------------------------
+
       if (result?.success) {
-        completeAuthentication();
+        completeAuthentication({
+          user: result.user || null,
+          authorizations: result.authorizations || [],
+        });
+
         return;
       }
+      // ------------------------------------------------
+      // Login Failed
+      // ------------------------------------------------
 
       if (result?.success === false) {
         setErrors({
           email: "",
           password: "",
-          form:
-            result.error ||
-            texts.invalidCredentials,
+          captcha: "",
+          form: result.error || texts.invalidCredentials,
         });
 
         if (behavior.clearPasswordOnError) {
@@ -153,9 +177,8 @@ function LoginForm({
       setErrors({
         email: "",
         password: "",
-        form:
-          submissionError?.message ||
-          texts.invalidCredentials,
+        captcha: "",
+        form: submissionError?.message || texts.invalidCredentials,
       });
 
       if (behavior.clearPasswordOnError) {
@@ -165,6 +188,10 @@ function LoginForm({
       setLoading(false);
     }
   };
+
+  // --------------------------------------------------
+  // Field Handlers
+  // --------------------------------------------------
 
   const handleEmailChange = (event) => {
     setEmail(event.target.value);
@@ -186,6 +213,25 @@ function LoginForm({
     }));
   };
 
+  // --------------------------------------------------
+  // CAPTCHA
+  // --------------------------------------------------
+
+  const handleCaptchaChange = (token) => {
+    /*
+     * Do NOT call setState here.
+     *
+     * Keeping the token inside a ref prevents
+     * Google's checkbox from being reset after
+     * successful verification.
+     */
+    captchaTokenRef.current = token || "";
+  };
+
+  // --------------------------------------------------
+  // Forgot Password
+  // --------------------------------------------------
+
   const handleForgotPassword = () => {
     setShowForgotPassword(true);
   };
@@ -205,6 +251,10 @@ function LoginForm({
     return onForgotPassword(data);
   };
 
+  // --------------------------------------------------
+  // Two Factor
+  // --------------------------------------------------
+
   const handleVerificationFailed = () => {
     if (!twoFactorData) {
       return;
@@ -213,37 +263,47 @@ function LoginForm({
     requireTwoFactor(twoFactorData);
   };
 
-  const disableSubmit =
-    loading &&
-    behavior.disableSubmitWhileLoading;
+  const disableSubmit = loading && behavior.disableSubmitWhileLoading;
+
+  // --------------------------------------------------
+  // Forgot Password Screen
+  // --------------------------------------------------
 
   if (showForgotPassword) {
     return (
       <ForgotPasswordForm
         config={{
-          label:
-            fields.email.label || "Email",
-          placeholder:
-            fields.email.placeholder ||
-            "Enter your email",
-          submitLabel:
-            texts.resetPassword ||
-            "Send Reset Link",
-          backLabel:
-            texts.backToLogin ||
-            "Back to Login",
+          label: fields.email.label || "Email",
+
+          placeholder: fields.email.placeholder || "Enter your email",
+
+          submitLabel: texts.resetPassword || "Send Reset Link",
+
+          backLabel: texts.backToLogin || "Back to Login",
         }}
         onSubmit={handleForgotPasswordSubmit}
         onBack={handleBackToLogin}
       />
     );
   }
+  if (authState === AUTH_STATES.AUTHENTICATED && authenticatedData) {
+    return (
+      <AuthLanding
+        user={authenticatedData.user}
+        authorizations={authenticatedData.authorizations}
+      />
+    );
+  }
 
- const isTwoFactorState =
-  authState === AUTH_STATES.TWO_FACTOR_REQUIRED ||
-  authState === AUTH_STATES.VERIFYING_2FA;
+  // --------------------------------------------------
+  // Two Factor Screen
+  // --------------------------------------------------
 
-if (isTwoFactorState && twoFactorData) {
+  const isTwoFactorState =
+    authState === AUTH_STATES.TWO_FACTOR_REQUIRED ||
+    authState === AUTH_STATES.VERIFYING_2FA;
+
+  if (isTwoFactorState && twoFactorData) {
     return (
       <TwoFactor
         config={config}
@@ -251,114 +311,186 @@ if (isTwoFactorState && twoFactorData) {
         onVerifyTwoFactor={onVerifyTwoFactor}
         onResendTwoFactor={onResendTwoFactor}
         onComplete={completeAuthentication}
-        onStartVerification={
-          startTwoFactorVerification
-        }
-        onVerificationFailed={
-          handleVerificationFailed
-        }
+        onStartVerification={startTwoFactorVerification}
+        onVerificationFailed={handleVerificationFailed}
       />
     );
   }
 
+  // --------------------------------------------------
+  // Login Screen
+  // --------------------------------------------------
+
   return (
     <Box
-      component="form"
-      onSubmit={handleSubmit}
-      noValidate
       sx={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
+        width: "100%",
+        maxWidth: 420,
       }}
     >
-      <LoginError message={errors.form} />
-
-      <EmailField
-        value={email}
-        onChange={handleEmailChange}
-        config={fields.email}
-        autoFocus={behavior.autoFocus}
-        disabled={loading}
-        error={Boolean(errors.email)}
-        helperText={errors.email}
-      />
-
-      {fields.password.enabled && (
-        <>
-          {login.passwordVisibility ? (
-            <PasswordField
-              value={password}
-              onChange={handlePasswordChange}
-              config={{
-                ...fields.password,
-                error: Boolean(errors.password),
-                helperText: errors.password,
-              }}
-              disabled={loading}
-            />
-          ) : (
-            <TextField
-              fullWidth
-              type="password"
-              label={fields.password.label}
-              placeholder={
-                fields.password.placeholder
-              }
-              required={fields.password.required}
-              value={password}
-              onChange={handlePasswordChange}
-              disabled={loading}
-              error={Boolean(errors.password)}
-              helperText={errors.password}
-            />
-          )}
-        </>
-      )}
-
-      {login.forgotPassword && (
-        <ForgotPassword
-          config={{
-            enabled:
-              fields.forgotPassword?.enabled ??
-              true,
-            label: texts.forgotPassword,
-          }}
-          onClick={handleForgotPassword}
-          disabled={loading}
-        />
-      )}
-
-      <Captcha
-        config={config.captcha}
-        value={captchaToken}
-        onChange={setCaptchaToken}
-        disabled={loading}
-      />
-
-      {login.rememberMe && (
-        <RememberMe
-          checked={rememberMe}
-          onChange={(event) =>
-            setRememberMe(
-              event.target.checked
-            )
-          }
-          config={fields.rememberMe}
-          disabled={loading}
-        />
-      )}
-
-      <Button
-        type="submit"
-        variant="contained"
-        fullWidth
-        disabled={disableSubmit}
+      {/* Login Header */}
+      <Box
+        sx={{
+          marginBottom: 4,
+        }}
       >
-        {loading
-          ? "Loading..."
-          : texts.loginButton}
-      </Button>
+        <Typography
+          component="h1"
+          sx={{
+            fontSize: {
+              xs: "1.75rem",
+              sm: "2rem",
+            },
+
+            fontWeight: 800,
+            lineHeight: 1.2,
+            letterSpacing: "-0.03em",
+            color: "text.primary",
+            marginBottom: 1,
+          }}
+        >
+          {login.title || "Welcome Back"}
+        </Typography>
+
+        <Typography
+          variant="body2"
+          sx={{
+            color: "text.secondary",
+            lineHeight: 1.6,
+          }}
+        >
+          {login.subtitle || "Sign-in to your account to continue"}
+        </Typography>
+      </Box>
+
+      {/* Login Form */}
+      <Box
+        component="form"
+        onSubmit={handleSubmit}
+        noValidate
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 1.75,
+        }}
+      >
+        <LoginError message={errors.form} />
+
+        {/* Email */}
+        <EmailField
+          value={email}
+          onChange={handleEmailChange}
+          config={fields.email}
+          autoFocus={behavior.autoFocus}
+          disabled={loading}
+          error={Boolean(errors.email)}
+          helperText={errors.email}
+        />
+
+        {/* Password */}
+        {fields.password.enabled && (
+          <>
+            {login.passwordVisibility ? (
+              <PasswordField
+                value={password}
+                onChange={handlePasswordChange}
+                config={{
+                  ...fields.password,
+
+                  error: Boolean(errors.password),
+
+                  helperText: errors.password,
+                }}
+                disabled={loading}
+              />
+            ) : (
+              <TextField
+                fullWidth
+                type="password"
+                label={fields.password.label}
+                placeholder={fields.password.placeholder}
+                required={fields.password.required}
+                value={password}
+                onChange={handlePasswordChange}
+                disabled={loading}
+                error={Boolean(errors.password)}
+                helperText={errors.password}
+              />
+            )}
+          </>
+        )}
+
+        {/* Remember Me */}
+        {login.rememberMe && (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              minHeight: 36,
+            }}
+          >
+            <RememberMe
+              checked={rememberMe}
+              onChange={(event) => setRememberMe(event.target.checked)}
+              config={fields.rememberMe}
+              disabled={loading}
+            />
+          </Box>
+        )}
+
+        {/* CAPTCHA */}
+        <Captcha
+          config={config.captcha}
+          onChange={handleCaptchaChange}
+          error={errors.captcha}
+          disabled={loading}
+        />
+
+        {/* Sign In */}
+        <Button
+          type="submit"
+          variant="contained"
+          fullWidth
+          disabled={disableSubmit}
+          sx={{
+            height: 42,
+            borderRadius: "6px",
+
+            fontSize: "0.84rem",
+            fontWeight: 700,
+            textTransform: "none",
+
+            boxShadow: "0 6px 14px rgba(99, 70, 229, 0.22)",
+
+            "&:hover": {
+              boxShadow: "0 8px 18px rgba(99, 70, 229, 0.28)",
+            },
+          }}
+        >
+          {loading ? "Signing in..." : texts.loginButton}
+        </Button>
+
+        {/* Forgot Password */}
+        {login.forgotPassword && (
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              marginTop: -0.5,
+            }}
+          >
+            <ForgotPassword
+              config={{
+                enabled: fields.forgotPassword?.enabled ?? true,
+
+                label: texts.forgotPassword,
+              }}
+              onClick={handleForgotPassword}
+              disabled={loading}
+            />
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 }

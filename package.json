@@ -43,6 +43,7 @@
   },
   "dependencies": {
     "@google-recaptcha/react": "^2.5.3",
-    "@mui/icons-material": "^9.4.0"
+    "@mui/icons-material": "^9.4.0",
+    "iconsax-react": "^0.0.8"
   }
 }
