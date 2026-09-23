@@ -3,32 +3,47 @@ import { useState } from "react";
 import { AUTH_STATES } from "./authStates";
 
 function useAuthFlow() {
-  const [authState, setAuthState] = useState(
-    AUTH_STATES.IDLE
-  );
+  const [authState, setAuthState] =
+    useState(AUTH_STATES.IDLE);
 
-  const [twoFactorData, setTwoFactorData] =
-    useState(null);
+  const [
+    twoFactorData,
+    setTwoFactorData,
+  ] = useState(null);
 
   /*
-   * Stores the final authenticated result.
+   * Stores the final authenticated UI data.
+   *
+   * Authentication credentials are intentionally
+   * NOT owned by this hook.
    *
    * Expected structure:
    *
    * {
    *   user: {
    *     userId: "...",
-   *     name: "..."
+   *     orgCode: "...",
+   *     ...
    *   },
+   *
    *   authorizations: [
    *     {
-   *       id: "...",
-   *       label: "...",
-   *       url: "..."
+   *       portalCode: "P-001",
+   *       name: "Marketing Portal",
+   *       websiteUrl: "https://...",
+   *       description: "...",
+   *       isActive: true
    *     }
    *   ]
    * }
+   *
+   * Access-token ownership belongs to the browser
+   * session layer.
+   *
+   * Refresh-token ownership belongs to the browser's
+   * HttpOnly cookie and is never exposed here.
    */
+
   const [
     authenticatedData,
     setAuthenticatedData,
@@ -87,7 +102,9 @@ function useAuthFlow() {
   // --------------------------------------------------
 
   const resetAuthentication = () => {
-    setAuthState(AUTH_STATES.IDLE);
+    setAuthState(
+      AUTH_STATES.IDLE
+    );
 
     setTwoFactorData(null);
 

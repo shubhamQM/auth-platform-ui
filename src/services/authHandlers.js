@@ -3,8 +3,13 @@
 // --------------------------------------------------
 
 export function createAuthHandlers(
-  authApiClient
+  authApiClient,
+  authSession
 ) {
+  // ------------------------------------------------
+  // Validate API client
+  // ------------------------------------------------
+
   if (
     !authApiClient ||
     typeof authApiClient !== "object"
@@ -33,6 +38,70 @@ export function createAuthHandlers(
   }
 
   // ------------------------------------------------
+  // Validate browser session
+  // ------------------------------------------------
+
+  if (
+    !authSession ||
+    typeof authSession !== "object" ||
+    typeof authSession.setAuthentication !==
+      "function" ||
+    typeof authSession.restore !==
+      "function" ||
+    typeof authSession.logout !==
+      "function"
+  ) {
+    throw new TypeError(
+      "A valid authSession with setAuthentication, restore and logout is required"
+    );
+  }
+
+  // ------------------------------------------------
+  // Store authenticated session
+  // ------------------------------------------------
+
+  function storeAuthentication({
+    accessToken,
+    session,
+    user,
+  }) {
+    if (
+      typeof accessToken !== "string" ||
+      !accessToken.trim()
+    ) {
+      return {
+        success: false,
+
+        code:
+          "INVALID_AUTH_RESPONSE",
+
+        error:
+          "Authentication service did not return an access token",
+      };
+    }
+
+    const authorizations =
+      user?.portals || [];
+
+    authSession.setAuthentication({
+      accessToken,
+      session,
+      user,
+      authorizations,
+    });
+
+    return {
+      success: true,
+
+      user,
+
+      authorizations,
+
+      session,
+    };
+  }
+
+  // ------------------------------------------------
   // Login
   // ------------------------------------------------
 
@@ -42,11 +111,20 @@ export function createAuthHandlers(
     rememberMe,
     captchaToken,
   }) {
-    const result = await login({
-      email,
-      password,
-      captchaToken,
-    });
+    // rememberMe is intentionally not forwarded yet.
+    //
+    // The backend currently owns the absolute session
+    // lifetime. Remember-me semantics will be added
+    // only when that contract is explicitly defined.
+
+    void rememberMe;
+
+    const result =
+      await login({
+        email,
+        password,
+        captchaToken,
+      });
 
     if (!result.success) {
       return {
@@ -92,15 +170,16 @@ export function createAuthHandlers(
     // Future non-2FA compatibility
     // ----------------------------------------------
 
-    return {
-      success: true,
+    return storeAuthentication({
+      accessToken:
+        result.accessToken,
+
+      session:
+        result.session,
 
       user:
         result.user,
-
-      authorizations:
-        result.user?.portals || [],
-    };
+    });
   }
 
   // ------------------------------------------------
@@ -136,10 +215,17 @@ export function createAuthHandlers(
       };
     }
 
+    // ----------------------------------------------
+    // Validate access token
+    // ----------------------------------------------
+
     const accessToken =
       result.accessToken;
 
-    if (!accessToken) {
+    if (
+      typeof accessToken !== "string" ||
+      !accessToken.trim()
+    ) {
       return {
         success: false,
 
@@ -173,26 +259,19 @@ export function createAuthHandlers(
       };
     }
 
-    return {
-      success: true,
+    // ----------------------------------------------
+    // Authentication completed
+    // ----------------------------------------------
 
-      user:
-        meResult.user,
-
-      authorizations:
-        meResult.user?.portals || [],
-
-      // TEMPORARY.
-      // Proper browser session handling comes later.
-      accessToken:
-        result.accessToken,
-
-      refreshToken:
-        result.refreshToken,
+    return storeAuthentication({
+      accessToken,
 
       session:
         result.session,
-    };
+
+      user:
+        meResult.user,
+    });
   }
 
   // ------------------------------------------------
@@ -257,6 +336,59 @@ export function createAuthHandlers(
   }
 
   // ------------------------------------------------
+  // Restore Session
+  //
+  // On browser reload the access token is gone from
+  // memory, but the HttpOnly refresh cookie may still
+  // represent a valid backend session.
+  //
+  // authSession.restore() handles:
+  //
+  // - refresh
+  // - new access token
+  // - /me
+  // - user
+  // - portals
+  // - session metadata
+  // ------------------------------------------------
+
+  async function handleRestoreSession() {
+    const result =
+      await authSession.restore();
+
+    if (
+      !result ||
+      result.success !== true
+    ) {
+      return {
+        success: false,
+
+        code:
+          result?.code ||
+          "SESSION_RESTORE_FAILED",
+
+        error:
+          result?.error ||
+          result?.message ||
+          "Unable to restore authentication session",
+      };
+    }
+
+    return {
+      success: true,
+
+      user:
+        result.user,
+
+      authorizations:
+        result.authorizations || [],
+
+      session:
+        result.session || null,
+    };
+  }
+
+  // ------------------------------------------------
   // Forgot password
   //
   // TEMPORARY MOCK.
@@ -268,7 +400,10 @@ export function createAuthHandlers(
     email,
   }) {
     await new Promise((resolve) => {
-      setTimeout(resolve, 1000);
+      setTimeout(
+        resolve,
+        1000
+      );
     });
 
     console.log(
@@ -287,6 +422,37 @@ export function createAuthHandlers(
   }
 
   // ------------------------------------------------
+  // Logout
+  // ------------------------------------------------
+
+  async function handleLogout() {
+    const result =
+      await authSession.logout();
+
+    if (!result.success) {
+      return {
+        success: false,
+
+        code:
+          result.code,
+
+        error:
+          result.error ||
+          result.message ||
+          "Unable to complete logout",
+      };
+    }
+
+    return {
+      success: true,
+
+      message:
+        result.message ||
+        "Logged out successfully",
+    };
+  }
+
+  // ------------------------------------------------
   // Public handlers
   // ------------------------------------------------
 
@@ -294,6 +460,8 @@ export function createAuthHandlers(
     handleLogin,
     handleVerifyTwoFactor,
     handleResendTwoFactor,
+    handleRestoreSession,
     handleForgotPassword,
+    handleLogout,
   });
 }

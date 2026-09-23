@@ -34,7 +34,6 @@ function Recaptcha({
   }
 
   const handleChange = (token) => {
-     console.log("reCAPTCHA token:", token);
     if (disabled) {
       return;
     }
@@ -58,7 +57,7 @@ function Recaptcha({
         <GoogleReCaptchaCheckbox
           onChange={handleChange}
           theme={config.theme || "light"}
-          size="normal"
+          size={config.size || "normal"}
         />
       </Box>
 

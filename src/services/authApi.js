@@ -7,7 +7,9 @@ export function createAuthApiClient({
 } = {}) {
   const normalizedBaseUrl =
     typeof baseUrl === "string"
-      ? baseUrl.trim().replace(/\/+$/, "")
+      ? baseUrl
+          .trim()
+          .replace(/\/+$/, "")
       : "";
 
   if (!normalizedBaseUrl) {
@@ -18,6 +20,13 @@ export function createAuthApiClient({
 
   // ------------------------------------------------
   // Shared request helper
+  //
+  // credentials: "include" is required because the
+  // Auth API manages the refresh token through an
+  // HttpOnly cookie.
+  //
+  // JavaScript cannot read that cookie.
+  // The browser receives and sends it automatically.
   // ------------------------------------------------
 
   async function request(
@@ -49,6 +58,9 @@ export function createAuthApiClient({
           method,
           headers,
 
+          credentials:
+            "include",
+
           body:
             body !== undefined
               ? JSON.stringify(body)
@@ -63,8 +75,10 @@ export function createAuthApiClient({
 
       return {
         success: false,
+
         code:
           "AUTH_SERVICE_UNAVAILABLE",
+
         message:
           "Unable to connect to the authentication service",
       };
@@ -78,10 +92,15 @@ export function createAuthApiClient({
     } catch {
       return {
         success: false,
+
         code:
           "INVALID_AUTH_RESPONSE",
+
         message:
           "Authentication service returned an invalid response",
+
+        httpStatus:
+          response.status,
       };
     }
 
@@ -99,6 +118,9 @@ export function createAuthApiClient({
 
         details:
           result?.details,
+
+        httpStatus:
+          response.status,
       };
     }
 
@@ -130,6 +152,12 @@ export function createAuthApiClient({
 
   // ------------------------------------------------
   // Verify 2FA
+  //
+  // On successful verification the Auth API sends
+  // the refresh token through Set-Cookie.
+  //
+  // Because request() uses credentials: "include",
+  // the browser can accept that cookie.
   // ------------------------------------------------
 
   async function verifyTwoFactor({
@@ -174,6 +202,8 @@ export function createAuthApiClient({
 
   // ------------------------------------------------
   // Current authenticated user
+  //
+  // Access token remains a Bearer token.
   // ------------------------------------------------
 
   async function getCurrentUser({
@@ -189,41 +219,44 @@ export function createAuthApiClient({
 
   // ------------------------------------------------
   // Refresh session
+  //
+  // No refresh-token argument exists here.
+  //
+  // The browser automatically sends the HttpOnly
+  // refresh cookie to the Auth API.
   // ------------------------------------------------
 
-  async function refreshSession({
-    refreshToken,
-  }) {
+  async function refreshSession() {
     return request(
       "/refresh",
       {
         method: "POST",
-
-        body: {
-          refreshToken,
-        },
       }
     );
   }
 
   // ------------------------------------------------
   // Logout
+  //
+  // No refresh-token argument exists here.
+  //
+  // The browser sends the HttpOnly refresh cookie.
+  // The backend revokes the server-side session and
+  // clears that cookie.
   // ------------------------------------------------
 
-  async function logout({
-    refreshToken,
-  }) {
+  async function logout() {
     return request(
       "/logout",
       {
         method: "POST",
-
-        body: {
-          refreshToken,
-        },
       }
     );
   }
+
+  // ------------------------------------------------
+  // Public API
+  // ------------------------------------------------
 
   return Object.freeze({
     login,
